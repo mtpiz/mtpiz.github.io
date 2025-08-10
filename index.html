@@ -164,17 +164,42 @@
   <div class="crosshair"></div>
 
   <script>
+    // =====================
+    // Resume Destroyer v2
+    // - Destruction only inside resume area
+    // - WebAudio sound effects
+    // - Beefier effects: screen shake, debris, stronger cracks
+    // =====================
+
     // Utility helpers
     const $ = s => document.querySelector(s);
     const $$ = s => Array.from(document.querySelectorAll(s));
 
-    // Weapon state
-    let weapon = 'hammer';
+    // Elements
+    const pageEl = document.getElementById('page');
+    const mainEl = document.querySelector('main');
     const crosshair = document.querySelector('.crosshair');
     const fx = document.getElementById('fx');
     const ctx = fx.getContext('2d');
+
+    // Canvas sizing
     let W=innerWidth,H=innerHeight; fx.width=W; fx.height=H;
     addEventListener('resize',()=>{W=innerWidth;H=innerHeight;fx.width=W;fx.height=H});
+
+    // Weapon state
+    let weapon = 'hammer';
+    let down=false; let px=0,py=0; let dragging=false;
+
+    // Sidebar additions: volume
+    (function addVolume(){
+      const s = document.createElement('div');
+      s.className='row';
+      s.innerHTML = `
+        <label class="hint" style="min-width:60px">Volume</label>
+        <input id="vol" type="range" min="0" max="1" step="0.01" value="0.6" style="width:140px" />
+      `;
+      document.querySelector('.sidebar .toolbar').after(s);
+    })();
 
     // Register weapon picker
     $$("input[name='weapon']").forEach(r=>r.addEventListener('change',e=>weapon=e.target.value));
@@ -184,27 +209,42 @@
     $('#heal').addEventListener('click', ()=> healAll());
     addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='r') location.reload(); });
 
-    // Damage system: we track damage on the nearest resume card under cursor
-    function elementAt(x,y){
-      const el = document.elementFromPoint(x,y);
-      // Prefer the closest resume card or text block
-      return el?.closest('.card, header.resume, footer.resume, h2, h3, p, a, strong') || el;
+    // Bounds helpers
+    function pageRect(){ return pageEl.getBoundingClientRect(); }
+    function insidePage(x,y){
+      const r = pageRect();
+      return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
     }
+    function withClip(fn){
+      const r = pageRect();
+      ctx.save();
+      ctx.beginPath(); ctx.rect(r.left, r.top, r.width, r.height); ctx.clip();
+      fn();
+      ctx.restore();
+    }
+
+    // Targeting only inside resume
+    function elementAt(x,y){
+      if(!insidePage(x,y)) return null;
+      const el = document.elementFromPoint(x,y);
+      return el?.closest('#page .card, #page header.resume, #page footer.resume, #page h2, #page h3, #page p, #page a, #page strong') || null;
+    }
+
+    // Damage system:
     function addDamage(el, amount=1){
-      if(!el || el===document.body || el===document.documentElement) return;
+      if(!el) return;
       const d = (parseInt(el.dataset.damage||'0') + amount);
       el.dataset.damage = d;
-      if(d>18) crumble(el);
-      else if(d>14) el.classList.add('damage-4');
+      if(d>20) crumble(el);
+      else if(d>15) el.classList.add('damage-4');
       else if(d>10) el.classList.add('damage-3');
-      else if(d>6) el.classList.add('damage-2');
+      else if(d>5) el.classList.add('damage-2');
       else if(d>2) el.classList.add('damage-1');
     }
     function healAll(){
       $$('[data-damage], .damage-1, .damage-2, .damage-3, .damage-4, .destroyed').forEach(el=>{
         el.removeAttribute('data-damage');
         el.classList.remove('damage-1','damage-2','damage-3','damage-4','destroyed','crumbled');
-        // unwrap bits if any
         if(el.dataset.bitsWrapped==='1'){
           el.innerHTML = el.textContent;
           delete el.dataset.bitsWrapped;
@@ -213,183 +253,196 @@
       ctx.clearRect(0,0,W,H);
     }
 
-    // Crumble: turn text into falling bits
+    // Crumble: turn text into falling bits only within the resume
     function crumble(el){
-      if(el.classList.contains('crumbled')) return;
-      if(el.children.length===0){
-        wrapBits(el);
-      } else {
-        // recurse into children for nicer effect
-        el.querySelectorAll(':scope *').forEach(node=>{
-          if(node.children.length===0) wrapBits(node);
-        });
+      if(!el || el.classList.contains('crumbled')) return;
+      if(el.children.length===0){ wrapBits(el); } else {
+        el.querySelectorAll(':scope *').forEach(node=>{ if(node.children.length===0) wrapBits(node); });
       }
       el.classList.add('crumbled','destroyed');
-      // animate bits falling
-      el.querySelectorAll('span.bit').forEach((span,i)=>{
-        const dx = (Math.random()*2-1)*60;
-        const dy = 100 + Math.random()*200;
-        const rot = (Math.random()*2-1)*40;
-        span.style.transition = 'transform 1.2s cubic-bezier(.2,.7,0,1), opacity 1.2s ease-out';
-        requestAnimationFrame(()=>{
-          span.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
-          span.style.opacity = 0;
-        });
+      el.querySelectorAll('span.bit').forEach((span)=>{
+        const dx = (Math.random()*2-1)*80;
+        const dy = 120 + Math.random()*240;
+        const rot = (Math.random()*2-1)*60;
+        span.style.transition = 'transform 1.1s cubic-bezier(.1,.7,0,1), opacity 1.1s ease-out';
+        requestAnimationFrame(()=>{ span.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`; span.style.opacity = 0; });
       });
+      shake(10,260);
     }
     function wrapBits(el){
-      const text = el.textContent;
-      if(!text || !text.trim()) return;
+      const text = el.textContent; if(!text || !text.trim()) return;
       el.dataset.bitsWrapped='1';
       el.innerHTML = text.split('').map(ch=>`<span class="bit">${ch===" "?"&nbsp;":ch}</span>`).join('');
     }
 
-    // FX helpers
-    function burst(x,y,count=12){
-      for(let i=0;i<count;i++){
-        const s=document.createElement('div');
-        s.className='spark';
-        document.body.appendChild(s);
-        const ang=Math.random()*Math.PI*2;
-        const speed= 2+Math.random()*6;
-        const life=400+Math.random()*500;
-        let vx=Math.cos(ang)*speed, vy=Math.sin(ang)*speed;
-        let t=0; const start=performance.now();
-        (function anim(now){
-          t=now-start; const dt=16;
-          x+=vx; y+=vy; vy+=0.25; // gravity
-          s.style.left=x+'px'; s.style.top=y+'px'; s.style.opacity = String(1 - t/life);
-          if(t<life) requestAnimationFrame(anim); else s.remove();
-        })(start);
-      }
+    // Screen shake
+    let shakeT=0, shakeMag=0;
+    function shake(mag=6, ms=220){
+      shakeMag = Math.max(shakeMag, mag);
+      const end = performance.now()+ms;
+      (function anim(){
+        const now = performance.now();
+        if(now < end){
+          const x = (Math.random()*2-1)*shakeMag;
+          const y = (Math.random()*2-1)*shakeMag;
+          mainEl.style.transform = `translate(${x}px, ${y}px)`;
+          requestAnimationFrame(anim);
+        } else { mainEl.style.transform = ''; }
+      })();
     }
-    function crack(x,y,r=70){
-      ctx.save();
-      ctx.strokeStyle='rgba(255,255,255,.9)';
-      ctx.lineWidth=1.2; ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=2;
-      const rays= 5+Math.random()*6;
+
+    // FX helpers (clipped to resume)
+    function burst(x,y,count=12){ withClip(()=>{
+      for(let i=0;i<count;i++){
+        const ang=Math.random()*Math.PI*2; const len= 20+Math.random()*90;
+        ctx.save(); ctx.strokeStyle='rgba(255,210,100,.8)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(ang)*len, y+Math.sin(ang)*len); ctx.stroke(); ctx.restore();
+      }
+    }); }
+
+    function crack(x,y,r=70){ withClip(()=>{
+      ctx.save(); ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.lineWidth=1.6; ctx.shadowColor='rgba(0,0,0,.55)'; ctx.shadowBlur=4;
+      const rays= 6+Math.random()*8;
       for(let i=0;i<rays;i++){
-        const a=Math.random()*Math.PI*2;
-        const len=r* (0.5+Math.random()*0.6);
+        const a=Math.random()*Math.PI*2; const len=r*(0.6+Math.random()*0.7);
         ctx.beginPath(); ctx.moveTo(x,y);
-        let cx=x, cy=y;
-        const jag= 2+Math.floor(Math.random()*4);
+        let cx=x, cy=y; const jag= 2+Math.floor(Math.random()*4);
         for(let j=0;j<jag;j++){
-          cx += Math.cos(a + (Math.random()-.5)*.3) * (len/jag);
-          cy += Math.sin(a + (Math.random()-.5)*.3) * (len/jag);
+          cx += Math.cos(a + (Math.random()-.5)*.35) * (len/jag);
+          cy += Math.sin(a + (Math.random()-.5)*.35) * (len/jag);
           ctx.lineTo(cx,cy);
         }
         ctx.stroke();
       }
       ctx.restore();
-    }
+    }); }
 
-    function scorch(x,y,r=50){
-      const g=ctx.createRadialGradient(x,y, 1, x,y, r);
-      g.addColorStop(0,'rgba(255,150,50,.35)');
-      g.addColorStop(.5,'rgba(120,40,10,.25)');
-      g.addColorStop(1,'rgba(0,0,0,.05)');
+    function scorch(x,y,r=60){ withClip(()=>{
+      const g=ctx.createRadialGradient(x,y, 2, x,y, r);
+      g.addColorStop(0,'rgba(255,150,50,.55)');
+      g.addColorStop(.5,'rgba(120,40,10,.35)');
+      g.addColorStop(1,'rgba(0,0,0,.15)');
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-    }
+    }); }
 
-    function laserCut(x0,y0,x1,y1){
-      ctx.save();
-      ctx.globalCompositeOperation='destination-out';
-      ctx.lineWidth=18; ctx.lineCap='round';
-      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-      ctx.restore();
-      ctx.save();
-      // bright beam
-      ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-      ctx.restore();
-    }
+    function laserCut(x0,y0,x1,y1){ withClip(()=>{
+      ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.lineWidth=26; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke(); ctx.restore();
+    }); }
 
-    function chainsawTear(x0,y0,x1,y1){
-      ctx.save();
-      ctx.globalCompositeOperation='destination-out';
-      ctx.lineWidth=26; ctx.lineCap='round';
-      // jagged path
-      const segs=12; ctx.beginPath(); ctx.moveTo(x0,y0);
-      for(let i=1;i<=segs;i++){
-        const t=i/segs; const mx=x0+(x1-x0)*t; const my=y0+(y1-y0)*t;
-        const off=(Math.random()-.5)*14; ctx.lineTo(mx+off, my-off);
-      }
+    function chainsawTear(x0,y0,x1,y1){ withClip(()=>{
+      ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.lineWidth=32; ctx.lineCap='round';
+      const segs=14; ctx.beginPath(); ctx.moveTo(x0,y0);
+      for(let i=1;i<=segs;i++){ const t=i/segs; const mx=x0+(x1-x0)*t; const my=y0+(y1-y0)*t; const off=(Math.random()-.5)*22; ctx.lineTo(mx+off, my-off); }
       ctx.stroke(); ctx.restore();
-    }
+    }); }
 
-    // Termites
+    // Termites random walk erase
     const termites=[];
-    function spawnTermite(x,y){
+    function spawnTermite(x,y){ if(!insidePage(x,y)) return;
       const t={x,y,dir:Math.random()*Math.PI*2,life: 6000+Math.random()*6000};
       termites.push(t);
       const started=performance.now();
       (function loop(now){
-        const dt=now-started; t.life -= 16; if(t.life<=0) return;
-        t.dir += (Math.random()-.5)*.5; const sp=2.2; t.x+=Math.cos(t.dir)*sp; t.y+=Math.sin(t.dir)*sp;
-        bite(t.x,t.y);
+        t.life -= 16; if(t.life<=0) return;
+        t.dir += (Math.random()-.5)*.5; const sp=2.4; t.x+=Math.cos(t.dir)*sp; t.y+=Math.sin(t.dir)*sp;
+        if(insidePage(t.x,t.y)) bite(t.x,t.y);
         if(t.x<0||t.x>W||t.y<0||t.y>H) { t.life=0; return; }
         requestAnimationFrame(loop);
       })(performance.now());
     }
-    function bite(x,y){
-      // tiny erase + damage underlying element
-      ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); ctx.restore();
-      addDamage(elementAt(x,y), 1);
-    }
+    function bite(x,y){ withClip(()=>{
+      ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,3.5,0,Math.PI*2); ctx.fill(); ctx.restore();
+      const el = elementAt(x,y); if(el) addDamage(el, 1);
+    }); }
 
     // Dynamite
-    function plantDynamite(x,y){
+    function plantDynamite(x,y){ if(!insidePage(x,y)) return;
+      play('fuse');
       const marker=document.createElement('div');
       marker.style.cssText=`position:fixed;left:${x-6}px;top:${y-12}px;width:12px;height:24px;border-radius:3px;background:#c1121f;box-shadow:0 0 8px rgba(255,80,80,.9);z-index:60`;
       document.body.appendChild(marker);
       const fuse=document.createElement('div');
       fuse.style.cssText=`position:fixed;left:${x+4}px;top:${y-18}px;width:6px;height:6px;border-radius:50%;background:#ffd166;box-shadow:0 0 12px #ffb703`;
       document.body.appendChild(fuse);
-      let t=0; const timer=setInterval(()=>{
-        t+=1; fuse.style.opacity = 0.6 + 0.4*Math.sin(t*0.6);
-      },60);
+      let t=0; const timer=setInterval(()=>{ t+=1; fuse.style.opacity = 0.6 + 0.4*Math.sin(t*0.6); },60);
       setTimeout(()=>{
         clearInterval(timer); marker.remove(); fuse.remove();
         // explosion
-        burst(x,y,40);
-        for(let i=0;i<10;i++) scorch(x+(Math.random()*2-1)*80, y+(Math.random()*2-1)*80, 80+Math.random()*60);
-        ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,120,0,Math.PI*2); ctx.fill(); ctx.restore();
-        // damage DOM elements within radius
-        const els = document.elementsFromPoint(x,y).slice(0,12);
-        els.forEach(el=> addDamage(el, 8));
+        withClip(()=>{ ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,140,0,Math.PI*2); ctx.fill(); ctx.restore(); });
+        burst(x,y,60); scorch(x,y,120); scorch(x+30,y-20,90); scorch(x-25,y+25,100);
+        const els = document.elementsFromPoint(x,y).slice(0,16); els.forEach(el=> addDamage(el, 10));
+        shake(18,420); play('explosion');
       }, 1800);
     }
 
-    // Interaction
-    let down=false; let px=0,py=0; let dragging=false;
+    // Interaction (now constrained to resume area)
     function pointer(e){
       const x = e.clientX, y = e.clientY; crosshair.style.setProperty('--x',x+'px'); crosshair.style.setProperty('--y',y+'px');
+      if(!insidePage(x,y)) { px=x; py=y; return; }
       if(down){ dragging=true; const el = elementAt(x,y); const turbo = e.shiftKey?2:1;
-        if(weapon==='laser') { laserCut(px,py,x,y); addDamage(el, 1*turbo); }
-        else if(weapon==='flame'){ scorch(x,y, 60*(e.shiftKey?1.3:1)); addDamage(el, 2*turbo); }
-        else if(weapon==='chainsaw'){ chainsawTear(px,py,x,y); addDamage(el, 2*turbo); }
-        else if(weapon==='hammer'){ /* while held, light cracks */ crack(x,y, 40); addDamage(el, 1); }
+        if(weapon==='laser') { laserCut(px,py,x,y); addDamage(el, 1*turbo); play('laser'); }
+        else if(weapon==='flame'){ scorch(x,y, 70*(e.shiftKey?1.3:1)); addDamage(el, 2*turbo); ensureLoop('flame'); }
+        else if(weapon==='chainsaw'){ chainsawTear(px,py,x,y); addDamage(el, 2*turbo); ensureLoop('chainsaw'); }
+        else if(weapon==='hammer'){ crack(x,y, 50); addDamage(el, 1); play('tap'); }
       }
       px=x; py=y;
     }
     addEventListener('pointermove', pointer);
-    addEventListener('pointerdown', (e)=>{ down=true; px=e.clientX; py=e.clientY; const el=elementAt(px,py);
-      if(weapon==='hammer'){ crack(px,py, 70); burst(px,py,16); addDamage(el, 5); }
+    addEventListener('pointerdown', (e)=>{
+      down=true; px=e.clientX; py=e.clientY;
+      if(!insidePage(px,py)) return;
+      const el=elementAt(px,py);
+      initAudio();
+      if(weapon==='hammer'){ crack(px,py, 80); burst(px,py,18); addDamage(el, 5); play('hammer'); }
       if(weapon==='dynamite'){ plantDynamite(px,py); }
-      if(weapon==='termites'){ for(let i=0;i< (e.shiftKey?12:5); i++) spawnTermite(px,py); }
+      if(weapon==='termites'){ for(let i=0;i< (e.shiftKey?14:6); i++) spawnTermite(px,py); play('termites'); }
+      if(weapon==='flame'){ ensureLoop('flame'); }
+      if(weapon==='chainsaw'){ ensureLoop('chainsaw'); }
     });
-    addEventListener('pointerup', ()=>{ down=false; dragging=false; });
+    addEventListener('pointerup', ()=>{ down=false; dragging=false; stopLoop('flame'); stopLoop('chainsaw'); });
 
-    // Minor polish: fade in, initial mask to allow erasing
-    ;(function initMask(){
-      // Fill canvas with transparent black to serve as erasable layer
-      ctx.fillStyle='rgba(0,0,0,0)'; ctx.clearRect(0,0,W,H);
-      // Paint a faint glass layer so cutting reveals the background page color for contrast
-      ctx.fillStyle='rgba(0,0,0,0.04)'; ctx.fillRect(0,0,W,H);
-    })();
+    // Initial faint glass layer (erasable) but clipped to resume
+    ;(function initMask(){ withClip(()=>{ ctx.fillStyle='rgba(0,0,0,0.04)'; ctx.fillRect(pageRect().left, pageRect().top, pageRect().width, pageRect().height); }); })();
 
     // Prevent accidental text selection while destroying
     document.addEventListener('mousedown', e=>{ if(e.target.closest('.page')) e.preventDefault(); }, {passive:false});
+
+    // ---------------------
+    // Simple WebAudio engine
+    // ---------------------
+    let AC=null, master=null; let loops={};
+    function initAudio(){ if(AC) return; AC = new (window.AudioContext||window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = parseFloat($('#vol')?.value||'0.6'); master.connect(AC.destination);
+      const vol = $('#vol'); if(vol) vol.addEventListener('input', ()=> master.gain.value=parseFloat(vol.value));
+    }
+    function env(duration=0.2, peak=0.9){ const g=AC.createGain(); g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(peak, AC.currentTime+0.005); g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+duration); return g; }
+    function noiseBuffer(){ const b=AC.createBuffer(1, AC.sampleRate*1.5, AC.sampleRate); const data=b.getChannelData(0); for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1; return b; }
+    const NOISE = ()=>{ const s=AC.createBufferSource(); s.buffer = noiseBuffer(); s.loop=false; return s; };
+
+    function play(type){ if(!AC) return; switch(type){
+      case 'hammer':{
+        const n=NOISE(); const e=env(0.12,0.8); n.connect(e).connect(master); n.start();
+        const osc=AC.createOscillator(); osc.type='sine'; osc.frequency.setValueAtTime(120,AC.currentTime); osc.frequency.exponentialRampToValueAtTime(60, AC.currentTime+0.12); osc.connect(e); osc.start(); osc.stop(AC.currentTime+0.13); break; }
+      case 'tap':{
+        const n=NOISE(); const e=env(0.05,0.5); n.connect(e).connect(master); n.start(); break; }
+      case 'laser':{
+        const o=AC.createOscillator(); const e=env(0.09,0.7); o.type='triangle'; o.frequency.setValueAtTime(2200,AC.currentTime); o.frequency.exponentialRampToValueAtTime(300, AC.currentTime+0.09); o.connect(e).connect(master); o.start(); o.stop(AC.currentTime+0.1); break; }
+      case 'explosion':{
+        const n=NOISE(); const e=env(0.8,1.0); const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(1000,AC.currentTime); lp.frequency.exponentialRampToValueAtTime(80, AC.currentTime+0.8); n.connect(lp).connect(e).connect(master); n.start(); break; }
+      case 'fuse':{
+        // gentle ticking fuse
+        const o=AC.createOscillator(); const g=AC.createGain(); o.type='square'; o.frequency.setValueAtTime(6, AC.currentTime); g.gain.value=0.05; o.connect(g).connect(master); o.start(); setTimeout(()=>o.stop(),1600); break; }
+      case 'termites':{
+        const o=AC.createOscillator(); const e=env(0.2,0.05); o.type='square'; o.frequency.value=600; o.connect(e).connect(master); o.start(); o.stop(AC.currentTime+0.2); break; }
+    }}
+
+    function ensureLoop(kind){ if(!AC) return; if(loops[kind]) return; switch(kind){
+      case 'flame':{
+        const n=NOISE(); const g=AC.createGain(); g.gain.value=0.05; const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1200; n.connect(bp).connect(g).connect(master); n.start(); loops[kind]={stop:()=>{try{n.stop();}catch{}}}; break; }
+      case 'chainsaw':{
+        const o=AC.createOscillator(); o.type='sawtooth'; o.frequency.value=110; const g=AC.createGain(); g.gain.value=0.08; o.connect(g).connect(master); o.start(); loops[kind]={stop:()=>{try{o.stop();}catch{}}}; break; }
+    }}
+    function stopLoop(kind){ if(loops[kind]){ loops[kind].stop(); delete loops[kind]; } }
   </script>
 </body>
 </html>
