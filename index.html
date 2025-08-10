@@ -1,124 +1,395 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matthew R. Pittman - Resume</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-            color: #333;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Destroyer — Matthew R. Pittman</title>
+  <style>
+    :root{
+      --blue:#007BFF;--ink:#333;--bg:#f4f4f4;--paper:#fff;--dark:#343A40;--accent:#ff5544;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+    /* --- Layout --- */
+    .app{display:grid;grid-template-columns: 280px 1fr;min-height:100vh}
+    .sidebar{position:sticky;top:0;align-self:start;height:100dvh;overflow:auto;padding:16px;background:#0e1116;color:#f0f3f7;border-right:1px solid #1b2230}
+    .sidebar h2{margin:0 0 12px 0;font-size:18px}
+    .toolbar{display:grid;gap:10px}
+    .tool{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#141a25;border:1px solid #1f2837;border-radius:12px;cursor:pointer;user-select:none}
+    .tool input[type="radio"]{accent-color:var(--accent)}
+    .tool:hover{background:#171f2c}
+    .tool .name{font-weight:600}
+    .tool small{opacity:.75}
+    .row{display:flex;gap:10px;align-items:center}
+    .btn{border:1px solid #1f2837;background:#151c28;color:#e9eef7;border-radius:12px;padding:10px 12px;font-weight:600;cursor:pointer}
+    .btn:hover{background:#192233}
+    .muted{opacity:.85}
+    .meter{height:6px;background:#1f2837;border-radius:99px;overflow:hidden}
+    .meter>i{display:block;height:100%;width:30%;background:linear-gradient(90deg,#3b82f6,#22d3ee)}
 
-        header {
-            text-align: center;
-            background-color: #007BFF;
-            color: #fff;
-            padding: 20px 0;
-            margin-bottom: 20px;
-        }
+    main{position:relative;padding:24px}
+    .page{max-width:900px;margin:0 auto;position:relative}
+    header.resume{ text-align:center;background-color:var(--blue); color:#fff; padding:20px 0;margin-bottom:20px;border-radius:12px }
+    header.resume h1{margin:0;font-size:36px}
+    header.resume p{margin:6px 0}
 
-        h1 {
-            color: #fff;
-        }
+    h2,h3{color:var(--blue)}
+    h2{background:var(--dark);color:#fff;padding:10px;margin-top:20px;border-radius:8px}
 
-        h2, h3 {
-            color: #007BFF;
-        }
+    .card{background:#fff;padding:20px;margin-bottom:20px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.05)}
+    footer.resume{ text-align:center; margin-top:20px; background-color: var(--dark); color:#fff; padding:10px 0; border-radius:12px }
 
-        h2 {
-            background-color: #343A40;
-            color: #fff;
-            padding: 10px;
-            margin-top: 20px;
-        }
+    .contact-info a{color:var(--blue);text-decoration:none}
+    .contact-info a:hover{text-decoration:underline}
 
-        .summary, .contact-info, .skills, .work-experience, .education, .industry-experience {
-            background-color: #fff;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-        }
+    /* Damage states */
+    .damage-1{filter:contrast(.95) brightness(.98)}
+    .damage-2{filter:grayscale(.2) brightness(.95)}
+    .damage-3{filter:grayscale(.5) brightness(.92) blur(.3px)}
+    .damage-4{filter:grayscale(.8) brightness(.88) blur(.6px)}
+    .destroyed{opacity:.08;transition:opacity .3s ease}
 
-        .contact-info p {
-            margin: 5px 0;
-        }
+    /* Falling bits */
+    .crumbled span.bit{display:inline-block;will-change:transform,opacity}
 
-        footer {
-            text-align: center;
-            margin-top: 20px;
-            background-color: #343A40;
-            color: #fff;
-            padding: 10px 0;
-        }
-    </style>
+    /* HUD crosshair for fun */
+    .crosshair{position:fixed;inset:0;pointer-events:none}
+    .crosshair::after{content:"";position:absolute;left:var(--x,50%);top:var(--y,50%);width:24px;height:24px;border:2px solid rgba(255,255,255,.7);border-radius:50%;transform:translate(-50%,-50%)}
+
+    /* Canvas overlay lives above content */
+    #fx{position:fixed;inset:0;pointer-events:none;z-index:50}
+    .spark{position:fixed;width:6px;height:6px;border-radius:50%;background:#ffd166;box-shadow:0 0 10px #ffb703;pointer-events:none}
+
+    /* Tooltips */
+    .sidebar .hint{font-size:12px;opacity:.8;line-height:1.4}
+
+    /* Mobile */
+    @media (max-width:900px){
+      .app{grid-template-columns:1fr}
+      .sidebar{position:static;height:auto}
+    }
+  </style>
 </head>
 <body>
-    <header>
-        <h1>MATTHEW R. PITTMAN</h1>
-        <p>Active TS/SCI clearance with current SSBI (10/2018)</p>
-        <p>CI-Scope polygraph (06/2018)</p>
-    </header>
+  <div class="app">
+    <aside class="sidebar" aria-label="Weapons and controls">
+      <h2>🧨 Resume Destroyer</h2>
+      <div class="meter" title="CPU vibes only"><i></i></div>
+      <p class="hint" style="margin:10px 0 18px">Pick a weapon, then click / click‑drag over the resume. Press <kbd>R</kbd> to reset. Hold <kbd>Shift</kbd> for turbo on some weapons.</p>
+      <div class="toolbar" role="radiogroup" aria-label="Weapons">
+        <label class="tool"><input type="radio" name="weapon" value="hammer" checked><div><div class="name">🔨 Hammer</div><small>Smash + cracks</small></div></label>
+        <label class="tool"><input type="radio" name="weapon" value="laser"><div><div class="name">🔫 Laser</div><small>Cut clean lines</small></div></label>
+        <label class="tool"><input type="radio" name="weapon" value="flame"><div><div class="name">🔥 Flamethrower</div><small>Scorch + erode</small></div></label>
+        <label class="tool"><input type="radio" name="weapon" value="dynamite"><div><div class="name">🧨 Dynamite</div><small>Timed blast</small></div></label>
+        <label class="tool"><input type="radio" name="weapon" value="termites"><div><div class="name">🐜 Termites</div><small>Nibble text</small></div></label>
+        <label class="tool"><input type="radio" name="weapon" value="chainsaw"><div><div class="name">🪚 Chainsaw</div><small>Drag to shred</small></div></label>
+      </div>
+      <hr style="border-color:#1f2837;border-style:solid none;opacity:.4;margin:16px 0">
+      <div class="row">
+        <button class="btn" id="reset">Reset (R)</button>
+        <button class="btn" id="heal">Heal</button>
+      </div>
+      <p class="hint">Reset rebuilds the page. Heal removes damage effects without rebuilding.</p>
+      <p class="hint muted">No audio; all effects are client‑side. Single file you can drop anywhere.</p>
+    </aside>
 
-    <div class="contact-info">
-        <p>Email: MPittman06@gmail.com</p>
-        <p>Phone: 720-300-9978</p>
-        <p>LinkedIn: <a href="www.linkedin.com/in/matthew-pittman" target="_blank">linkedin.com/in/matthew-pittman</a></p>
-    </div>
+    <main>
+      <div class="page" id="page">
+        <!-- ======= ORIGINAL RESUME CONTENT ======= -->
+        <header class="resume">
+          <h1>MATTHEW R. PITTMAN</h1>
+          <p>Active TS/SCI clearance with current SSBI (10/2018)</p>
+          <p>CI-Scope polygraph (06/2018)</p>
+        </header>
 
-    <section class="summary">
-        <h2>SUMMARY</h2>
-        <p>Highly adaptive and driven individual leveraging prior professional analyst experience and master’s degree in Computer Information Systems to give a unique perspective and solve complex technical problems. Currently holds an active TS/SCI with CI Poly and looking for challenging and rewarding work in the cleared defense Industry.</p>
-    </section>
+        <section class="card contact-info">
+          <p>Email: <a href="mailto:MPittman06@gmail.com">MPittman06@gmail.com</a></p>
+          <p>Phone: <a href="tel:17203009978">720-300-9978</a></p>
+          <p>LinkedIn: <a href="https://www.linkedin.com/in/matthew-pittman" target="_blank" rel="noopener">linkedin.com/in/matthew-pittman</a></p>
+        </section>
 
-    <section class="skills">
-        <h2>SKILLS</h2>
-        <p><strong>Software:</strong> Windows, Microsoft Office Suite, VBA, Visual Studio, Eclipse IDE, SQL Server Management Studio, Visio, Linux, KaliLinux, VMWare Vsphere, GIT, Subversion, JIRA, Sharepoint</p>
-        <p><strong>Languages:</strong> Java, C++, Python, SQL, Powershell, VB.Net, HTML, CSS, XML, Javascript, PHP, ASP.NET, UML</p>
-    </section>
+        <section class="card summary">
+          <h2>SUMMARY</h2>
+          <p>Highly adaptive and driven individual leveraging prior professional analyst experience and master’s degree in Computer Information Systems to give a unique perspective and solve complex technical problems. Currently holds an active TS/SCI with CI Poly and looking for challenging and rewarding work in the cleared defense Industry.</p>
+        </section>
 
-    <section class="work-experience">
-        <h2>WORK EXPERIENCE</h2>
+        <section class="card skills">
+          <h2>SKILLS</h2>
+          <p><strong>Software:</strong> Windows, Microsoft Office Suite, VBA, Visual Studio, Eclipse IDE, SQL Server Management Studio, Visio, Linux, KaliLinux, VMWare Vsphere, GIT, Subversion, JIRA, Sharepoint</p>
+          <p><strong>Languages:</strong> Java, C++, Python, SQL, Powershell, VB.Net, HTML, CSS, XML, Javascript, PHP, ASP.NET, UML</p>
+        </section>
 
-        <h3>Lockheed Martin – Data Engineer III (Feb 2021 – Present)</h3>
-        <p>Support the Information Modernization effort within BITEE</p>
+        <section class="card work-experience">
+          <h2>WORK EXPERIENCE</h2>
 
-        <h3>Lockheed Martin – Software Engineer II (Nov 2019 – Feb 2021)</h3>
-        <p>Software Test Engineer doing Software Integration Testing and unit testing</p>
-        <p>Primarily utilizing C++ and Python with Git and Subversion version control systems</p>
-        <p>Writing and presenting test procedures to peers, management and customers</p>
+          <h3>Lockheed Martin – Data Engineer III (Feb 2021 – Present)</h3>
+          <p>Support the Information Modernization effort within BITEE</p>
 
-        <!-- Add other work experience entries as needed -->
+          <h3>Lockheed Martin – Software Engineer II (Nov 2019 – Feb 2021)</h3>
+          <p>Software Test Engineer doing Software Integration Testing and unit testing</p>
+          <p>Primarily utilizing C++ and Python with Git and Subversion version control systems</p>
+          <p>Writing and presenting test procedures to peers, management and customers</p>
+        </section>
 
-    </section>
+        <section class="card education">
+          <h2>EDUCATION</h2>
+          <p><strong>Colorado State University</strong></p>
+          <p>Master of Computer Information Systems - May 2017 | GPA: 3.72</p>
+          <p>Bachelor of Science in Business Administration - May 2011 | GPA: 3.20</p>
+        </section>
 
-    <section class="education">
-        <h2>EDUCATION</h2>
-        <p><strong>Colorado State University</strong></p>
-        <p>Master of Computer Information Systems - May 2017 | GPA: 3.72</p>
-        <p>Bachelor of Science in Business Administration - May 2011 | GPA: 3.20</p>
-    </section>
+        <section class="card industry-experience">
+          <h2>FORMER FINANCIAL INDUSTRY EXPERIENCE</h2>
 
-    <section class="industry-experience">
-        <h2>FORMER FINANCIAL INDUSTRY EXPERIENCE</h2>
+          <h3>Great West Financial – Valuation Analyst, Senior Valuation Analyst (Aug 2013 – Feb 2018)</h3>
+          <p>Back end financial support - Big Data, SQL, ETL using Access/SQL Server Management Studio</p>
+          <p>Led several multi-department automation projects leveraging Python, VBA, Batch and SQL</p>
 
-        <h3>Great West Financial – Valuation Analyst, Senior Valuation Analyst (Aug 2013 – Feb 2018)</h3>
-        <p>Back end financial support - Big Data, SQL, ETL using Access/SQL Server Management Studio</p>
-        <p>Led several multi-department automation projects leveraging Python, VBA, Batch and SQL</p>
+          <h3>ALPS Fund Services - Fund Accountant, Senior Fund Accountant (May 2011 – Aug 2013)</h3>
+          <p>Mutual fund accounting dealing with complex financial derivatives</p>
+          <p>Started automation efforts to increase team efficiency and data accuracy primarily using VBA</p>
+        </section>
 
-        <h3>ALPS Fund Services - Fund Accountant, Senior Fund Accountant (May 2011 – Aug 2013)</h3>
-        <p>Mutual fund accounting dealing with complex financial derivatives</p>
-        <p>Started automation efforts to increase team efficiency and data accuracy primarily using VBA</p>
+        <footer class="resume">
+          <p>&copy; 2025 Matthew R. Pittman. All rights reserved.</p>
+        </footer>
+        <!-- ======= /RESUME ======= -->
+      </div>
+    </main>
+  </div>
 
-        <!-- Add other industry experience entries as needed -->
+  <!-- Effects Canvas -->
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div class="crosshair"></div>
 
-    </section>
+  <script>
+    // Utility helpers
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
 
-    <footer>
-        <p>&copy; 2023 Matthew R. Pittman. All rights reserved.</p>
-    </footer>
+    // Weapon state
+    let weapon = 'hammer';
+    const crosshair = document.querySelector('.crosshair');
+    const fx = document.getElementById('fx');
+    const ctx = fx.getContext('2d');
+    let W=innerWidth,H=innerHeight; fx.width=W; fx.height=H;
+    addEventListener('resize',()=>{W=innerWidth;H=innerHeight;fx.width=W;fx.height=H});
+
+    // Register weapon picker
+    $$("input[name='weapon']").forEach(r=>r.addEventListener('change',e=>weapon=e.target.value));
+
+    // Reset / Heal
+    $('#reset').addEventListener('click', ()=> location.reload());
+    $('#heal').addEventListener('click', ()=> healAll());
+    addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='r') location.reload(); });
+
+    // Damage system: we track damage on the nearest resume card under cursor
+    function elementAt(x,y){
+      const el = document.elementFromPoint(x,y);
+      // Prefer the closest resume card or text block
+      return el?.closest('.card, header.resume, footer.resume, h2, h3, p, a, strong') || el;
+    }
+    function addDamage(el, amount=1){
+      if(!el || el===document.body || el===document.documentElement) return;
+      const d = (parseInt(el.dataset.damage||'0') + amount);
+      el.dataset.damage = d;
+      if(d>18) crumble(el);
+      else if(d>14) el.classList.add('damage-4');
+      else if(d>10) el.classList.add('damage-3');
+      else if(d>6) el.classList.add('damage-2');
+      else if(d>2) el.classList.add('damage-1');
+    }
+    function healAll(){
+      $$('[data-damage], .damage-1, .damage-2, .damage-3, .damage-4, .destroyed').forEach(el=>{
+        el.removeAttribute('data-damage');
+        el.classList.remove('damage-1','damage-2','damage-3','damage-4','destroyed','crumbled');
+        // unwrap bits if any
+        if(el.dataset.bitsWrapped==='1'){
+          el.innerHTML = el.textContent;
+          delete el.dataset.bitsWrapped;
+        }
+      });
+      ctx.clearRect(0,0,W,H);
+    }
+
+    // Crumble: turn text into falling bits
+    function crumble(el){
+      if(el.classList.contains('crumbled')) return;
+      if(el.children.length===0){
+        wrapBits(el);
+      } else {
+        // recurse into children for nicer effect
+        el.querySelectorAll(':scope *').forEach(node=>{
+          if(node.children.length===0) wrapBits(node);
+        });
+      }
+      el.classList.add('crumbled','destroyed');
+      // animate bits falling
+      el.querySelectorAll('span.bit').forEach((span,i)=>{
+        const dx = (Math.random()*2-1)*60;
+        const dy = 100 + Math.random()*200;
+        const rot = (Math.random()*2-1)*40;
+        span.style.transition = 'transform 1.2s cubic-bezier(.2,.7,0,1), opacity 1.2s ease-out';
+        requestAnimationFrame(()=>{
+          span.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
+          span.style.opacity = 0;
+        });
+      });
+    }
+    function wrapBits(el){
+      const text = el.textContent;
+      if(!text || !text.trim()) return;
+      el.dataset.bitsWrapped='1';
+      el.innerHTML = text.split('').map(ch=>`<span class="bit">${ch===" "?"&nbsp;":ch}</span>`).join('');
+    }
+
+    // FX helpers
+    function burst(x,y,count=12){
+      for(let i=0;i<count;i++){
+        const s=document.createElement('div');
+        s.className='spark';
+        document.body.appendChild(s);
+        const ang=Math.random()*Math.PI*2;
+        const speed= 2+Math.random()*6;
+        const life=400+Math.random()*500;
+        let vx=Math.cos(ang)*speed, vy=Math.sin(ang)*speed;
+        let t=0; const start=performance.now();
+        (function anim(now){
+          t=now-start; const dt=16;
+          x+=vx; y+=vy; vy+=0.25; // gravity
+          s.style.left=x+'px'; s.style.top=y+'px'; s.style.opacity = String(1 - t/life);
+          if(t<life) requestAnimationFrame(anim); else s.remove();
+        })(start);
+      }
+    }
+    function crack(x,y,r=70){
+      ctx.save();
+      ctx.strokeStyle='rgba(255,255,255,.9)';
+      ctx.lineWidth=1.2; ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=2;
+      const rays= 5+Math.random()*6;
+      for(let i=0;i<rays;i++){
+        const a=Math.random()*Math.PI*2;
+        const len=r* (0.5+Math.random()*0.6);
+        ctx.beginPath(); ctx.moveTo(x,y);
+        let cx=x, cy=y;
+        const jag= 2+Math.floor(Math.random()*4);
+        for(let j=0;j<jag;j++){
+          cx += Math.cos(a + (Math.random()-.5)*.3) * (len/jag);
+          cy += Math.sin(a + (Math.random()-.5)*.3) * (len/jag);
+          ctx.lineTo(cx,cy);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function scorch(x,y,r=50){
+      const g=ctx.createRadialGradient(x,y, 1, x,y, r);
+      g.addColorStop(0,'rgba(255,150,50,.35)');
+      g.addColorStop(.5,'rgba(120,40,10,.25)');
+      g.addColorStop(1,'rgba(0,0,0,.05)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
+
+    function laserCut(x0,y0,x1,y1){
+      ctx.save();
+      ctx.globalCompositeOperation='destination-out';
+      ctx.lineWidth=18; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      // bright beam
+      ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+      ctx.restore();
+    }
+
+    function chainsawTear(x0,y0,x1,y1){
+      ctx.save();
+      ctx.globalCompositeOperation='destination-out';
+      ctx.lineWidth=26; ctx.lineCap='round';
+      // jagged path
+      const segs=12; ctx.beginPath(); ctx.moveTo(x0,y0);
+      for(let i=1;i<=segs;i++){
+        const t=i/segs; const mx=x0+(x1-x0)*t; const my=y0+(y1-y0)*t;
+        const off=(Math.random()-.5)*14; ctx.lineTo(mx+off, my-off);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+
+    // Termites
+    const termites=[];
+    function spawnTermite(x,y){
+      const t={x,y,dir:Math.random()*Math.PI*2,life: 6000+Math.random()*6000};
+      termites.push(t);
+      const started=performance.now();
+      (function loop(now){
+        const dt=now-started; t.life -= 16; if(t.life<=0) return;
+        t.dir += (Math.random()-.5)*.5; const sp=2.2; t.x+=Math.cos(t.dir)*sp; t.y+=Math.sin(t.dir)*sp;
+        bite(t.x,t.y);
+        if(t.x<0||t.x>W||t.y<0||t.y>H) { t.life=0; return; }
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+    function bite(x,y){
+      // tiny erase + damage underlying element
+      ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); ctx.restore();
+      addDamage(elementAt(x,y), 1);
+    }
+
+    // Dynamite
+    function plantDynamite(x,y){
+      const marker=document.createElement('div');
+      marker.style.cssText=`position:fixed;left:${x-6}px;top:${y-12}px;width:12px;height:24px;border-radius:3px;background:#c1121f;box-shadow:0 0 8px rgba(255,80,80,.9);z-index:60`;
+      document.body.appendChild(marker);
+      const fuse=document.createElement('div');
+      fuse.style.cssText=`position:fixed;left:${x+4}px;top:${y-18}px;width:6px;height:6px;border-radius:50%;background:#ffd166;box-shadow:0 0 12px #ffb703`;
+      document.body.appendChild(fuse);
+      let t=0; const timer=setInterval(()=>{
+        t+=1; fuse.style.opacity = 0.6 + 0.4*Math.sin(t*0.6);
+      },60);
+      setTimeout(()=>{
+        clearInterval(timer); marker.remove(); fuse.remove();
+        // explosion
+        burst(x,y,40);
+        for(let i=0;i<10;i++) scorch(x+(Math.random()*2-1)*80, y+(Math.random()*2-1)*80, 80+Math.random()*60);
+        ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.beginPath(); ctx.arc(x,y,120,0,Math.PI*2); ctx.fill(); ctx.restore();
+        // damage DOM elements within radius
+        const els = document.elementsFromPoint(x,y).slice(0,12);
+        els.forEach(el=> addDamage(el, 8));
+      }, 1800);
+    }
+
+    // Interaction
+    let down=false; let px=0,py=0; let dragging=false;
+    function pointer(e){
+      const x = e.clientX, y = e.clientY; crosshair.style.setProperty('--x',x+'px'); crosshair.style.setProperty('--y',y+'px');
+      if(down){ dragging=true; const el = elementAt(x,y); const turbo = e.shiftKey?2:1;
+        if(weapon==='laser') { laserCut(px,py,x,y); addDamage(el, 1*turbo); }
+        else if(weapon==='flame'){ scorch(x,y, 60*(e.shiftKey?1.3:1)); addDamage(el, 2*turbo); }
+        else if(weapon==='chainsaw'){ chainsawTear(px,py,x,y); addDamage(el, 2*turbo); }
+        else if(weapon==='hammer'){ /* while held, light cracks */ crack(x,y, 40); addDamage(el, 1); }
+      }
+      px=x; py=y;
+    }
+    addEventListener('pointermove', pointer);
+    addEventListener('pointerdown', (e)=>{ down=true; px=e.clientX; py=e.clientY; const el=elementAt(px,py);
+      if(weapon==='hammer'){ crack(px,py, 70); burst(px,py,16); addDamage(el, 5); }
+      if(weapon==='dynamite'){ plantDynamite(px,py); }
+      if(weapon==='termites'){ for(let i=0;i< (e.shiftKey?12:5); i++) spawnTermite(px,py); }
+    });
+    addEventListener('pointerup', ()=>{ down=false; dragging=false; });
+
+    // Minor polish: fade in, initial mask to allow erasing
+    ;(function initMask(){
+      // Fill canvas with transparent black to serve as erasable layer
+      ctx.fillStyle='rgba(0,0,0,0)'; ctx.clearRect(0,0,W,H);
+      // Paint a faint glass layer so cutting reveals the background page color for contrast
+      ctx.fillStyle='rgba(0,0,0,0.04)'; ctx.fillRect(0,0,W,H);
+    })();
+
+    // Prevent accidental text selection while destroying
+    document.addEventListener('mousedown', e=>{ if(e.target.closest('.page')) e.preventDefault(); }, {passive:false});
+  </script>
 </body>
 </html>
