@@ -1,0 +1,215 @@
+:root {
+  --blue: #007BFF;
+  --ink: #333;
+  --bg: #1a1a2e;
+  --paper: #fff;
+  --dark: #343A40;
+  --accent: #ff5544;
+  --sidebar-bg: #0e1116;
+  --sidebar-border: #1b2230;
+  --tool-bg: #141a25;
+  --tool-border: #1f2837;
+  --tool-hover: #171f2c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: none;
+}
+
+/* Custom cursor - rendered by PixiJS */
+#app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  position: relative;
+  z-index: 100;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--sidebar-bg);
+  color: #f0f3f7;
+  border-right: 1px solid var(--sidebar-border);
+  cursor: default;
+}
+.sidebar h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #ff5544, #ff8866);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.toolbar { display: grid; gap: 8px; }
+
+.tool {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--tool-bg);
+  border: 1px solid var(--tool-border);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+.tool:hover { background: var(--tool-hover); border-color: #2a3548; }
+.tool.active {
+  background: #1a2435;
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(255, 85, 68, 0.15);
+}
+.tool .icon { font-size: 24px; flex-shrink: 0; }
+.tool .name { font-weight: 600; font-size: 14px; }
+.tool small { opacity: 0.65; font-size: 12px; }
+.tool .key-hint {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+.row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+
+.btn {
+  border: 1px solid var(--tool-border);
+  background: var(--tool-bg);
+  color: #e9eef7;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn:hover { background: #192233; }
+
+.hint { font-size: 12px; opacity: 0.75; line-height: 1.5; }
+.muted { opacity: 0.5; margin-top: 16px; }
+
+.meter {
+  height: 6px;
+  background: var(--tool-border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.meter > i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #3b82f6, #ef4444);
+  transition: width 0.3s ease;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin: 14px 0;
+}
+
+.stats {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: 0.6;
+  line-height: 1.8;
+}
+
+/* Input styling */
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+/* Main area */
+main {
+  position: relative;
+  overflow: auto;
+  background: var(--bg);
+}
+
+#resume-container {
+  padding: 24px;
+  min-height: 100%;
+}
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* Resume styles */
+.resume-header {
+  text-align: center;
+  background: linear-gradient(135deg, #007BFF, #0056b3);
+  color: #fff;
+  padding: 24px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3);
+}
+.resume-header h1 { font-size: 34px; letter-spacing: 1px; }
+.resume-header p { margin-top: 6px; opacity: 0.9; }
+
+h2 {
+  color: #fff;
+  background: var(--dark);
+  padding: 10px 14px;
+  margin: 20px 0 12px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+h3 { color: var(--blue); margin: 14px 0 6px; font-size: 15px; }
+
+.card {
+  background: #fff;
+  padding: 20px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.card p { margin: 4px 0; line-height: 1.6; }
+
+.resume-footer {
+  text-align: center;
+  background: var(--dark);
+  color: #fff;
+  padding: 12px;
+  border-radius: 12px;
+  margin-top: 20px;
+  opacity: 0.8;
+}
+
+.contact-info a { color: var(--blue); text-decoration: none; }
+.contact-info a:hover { text-decoration: underline; }
+
+/* PixiJS canvas overlay */
+#pixi-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  #app { grid-template-columns: 1fr; }
+  .sidebar { height: auto; max-height: 40vh; }
+}
