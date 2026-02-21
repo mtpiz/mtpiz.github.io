@@ -84,8 +84,8 @@ export class Game {
       height: window.innerHeight,
       backgroundAlpha: 0,
       antialias: true,
-      resolution: window.devicePixelRatio || 1,
-      autoDensity: true,
+      resolution: 1,
+      autoDensity: false,
     });
 
     // Create layers
