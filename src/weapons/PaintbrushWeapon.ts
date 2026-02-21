@@ -20,12 +20,13 @@ export class PaintbrushWeapon extends Weapon {
 
   onPointerDown(x: number, y: number, shift: boolean) {
     this.painting = true;
-    // New random color each stroke
     this.currentColor = PAINT_COLORS[Math.floor(Math.random() * PAINT_COLORS.length)];
     this.brushSize = shift ? 18 : 8;
 
     if (this.inBounds(x, y)) {
-      this.paintDot(x, y);
+      const f = this.toFx(x, y);
+      this.paintGfx.circle(f.x, f.y, this.brushSize / 2);
+      this.paintGfx.fill({ color: this.currentColor, alpha: 0.6 });
       this.game.audio.play('spray');
     }
   }
@@ -35,24 +36,24 @@ export class PaintbrushWeapon extends Weapon {
     if (!this.inBounds(x, y)) return;
     this.brushSize = shift ? 18 : 8;
 
-    // Paint stroke
-    this.paintGfx.moveTo(prevX, prevY);
-    this.paintGfx.lineTo(x, y);
+    const f = this.toFx(x, y);
+    const fp = this.toFx(prevX, prevY);
+
+    this.paintGfx.moveTo(fp.x, fp.y);
+    this.paintGfx.lineTo(f.x, f.y);
     this.paintGfx.stroke({ color: this.currentColor, width: this.brushSize, alpha: 0.6, cap: 'round' });
 
-    // Drip effect randomly
     if (Math.random() < 0.08) {
       const dripLen = 10 + Math.random() * 30;
-      this.paintGfx.moveTo(x, y);
-      this.paintGfx.lineTo(x + (Math.random() - 0.5) * 4, y + dripLen);
+      this.paintGfx.moveTo(f.x, f.y);
+      this.paintGfx.lineTo(f.x + (Math.random() - 0.5) * 4, f.y + dripLen);
       this.paintGfx.stroke({ color: this.currentColor, width: 2 + Math.random() * 2, alpha: 0.4, cap: 'round' });
     }
 
-    // Spray particles
     if (Math.random() < 0.3) {
       this.game.particles.emit({
-        x: x + (Math.random() - 0.5) * 20,
-        y: y + (Math.random() - 0.5) * 20,
+        x: f.x + (Math.random() - 0.5) * 20,
+        y: f.y + (Math.random() - 0.5) * 20,
         vx: (Math.random() - 0.5) * 2,
         vy: 0.5 + Math.random(),
         life: 0.5 + Math.random() * 0.5,
@@ -70,14 +71,6 @@ export class PaintbrushWeapon extends Weapon {
     this.game.audio.play('spray');
   }
 
-  private paintDot(x: number, y: number) {
-    this.paintGfx.circle(x, y, this.brushSize / 2);
-    this.paintGfx.fill({ color: this.currentColor, alpha: 0.6 });
-  }
-
-  onPointerUp() {
-    this.painting = false;
-  }
-
+  onPointerUp() { this.painting = false; }
   update(_dt: number) {}
 }

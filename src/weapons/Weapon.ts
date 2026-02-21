@@ -12,7 +12,13 @@ export abstract class Weapon {
     return this.game.inResumeBounds(x, y);
   }
 
+  /** Damage DOM elements — uses viewport coords for elementFromPoint */
   protected damageAt(x: number, y: number, amount: number) {
     this.game.addDamageAt(x, y, amount);
+  }
+
+  /** Convert viewport coords to effect-space (scroll-compensated) for PixiJS drawing */
+  protected toFx(x: number, y: number): { x: number; y: number } {
+    return this.game.viewportToFx(x, y);
   }
 }

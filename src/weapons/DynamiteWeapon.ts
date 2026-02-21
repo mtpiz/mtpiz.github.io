@@ -3,8 +3,8 @@ import { Weapon } from './Weapon';
 import type { Game } from '../Game';
 
 interface PlantedDynamite {
-  x: number;
-  y: number;
+  vx: number; vy: number; // viewport coords for damageAt
+  fx: number; fy: number; // fx-space coords for drawing
   fuse: number;
   maxFuse: number;
   gfx: Graphics;
@@ -20,29 +20,26 @@ export class DynamiteWeapon extends Weapon {
     if (!this.inBounds(x, y)) return;
 
     const fuseTime = shift ? 1.0 : 2.0;
+    const f = this.toFx(x, y);
 
-    // Draw dynamite stick
     const gfx = new Graphics();
     gfx.roundRect(-6, -14, 12, 28, 3);
     gfx.fill({ color: 0xcc1111 });
-    // Fuse line
     gfx.moveTo(0, -14);
     gfx.lineTo(4, -22);
     gfx.stroke({ color: 0x886644, width: 2 });
-    gfx.position.set(x, y);
+    gfx.position.set(f.x, f.y);
     this.game.fxContainer.addChild(gfx);
 
-    // Timer text
     const label = new Text({
       text: fuseTime.toFixed(1),
       style: { fontSize: 14, fill: 0xff4444, fontWeight: 'bold', fontFamily: 'monospace' },
     });
     label.anchor.set(0.5);
-    label.position.set(x, y - 30);
+    label.position.set(f.x, f.y - 30);
     this.game.fxContainer.addChild(label);
 
-    this.planted.push({ x, y, fuse: fuseTime, maxFuse: fuseTime, gfx, label });
-
+    this.planted.push({ vx: x, vy: y, fx: f.x, fy: f.y, fuse: fuseTime, maxFuse: fuseTime, gfx, label });
     this.game.audio.play('fuse');
   }
 
@@ -55,13 +52,11 @@ export class DynamiteWeapon extends Weapon {
       d.fuse -= dt;
       d.label.text = Math.max(0, d.fuse).toFixed(1);
 
-      // Blink effect
       const blink = Math.sin(d.fuse * 12) > 0;
       d.gfx.alpha = blink ? 1 : 0.6;
 
-      // Fuse sparks
       if (Math.random() < 0.3) {
-        this.game.particles.emitSparks(d.x + 4, d.y - 22, 2);
+        this.game.particles.emitSparks(d.fx + 4, d.fy - 22, 2);
       }
 
       if (d.fuse <= 0) {
@@ -76,45 +71,34 @@ export class DynamiteWeapon extends Weapon {
   }
 
   private explode(d: PlantedDynamite) {
-    const { x, y } = d;
+    const { fx: x, fy: y, vx, vy } = d;
 
-    // Massive burn mark
     this.game.damage.addBurn(x, y, 120);
     this.game.damage.addBurn(x + 30, y - 20, 80);
     this.game.damage.addBurn(x - 25, y + 25, 90);
-
-    // Big hole
     this.game.damage.addHole(x, y, 40);
-
-    // Lots of cracks
     this.game.damage.addCrack(x, y, 140);
 
-    // Tons of particles
     this.game.particles.emitSparks(x, y, 80);
     this.game.particles.emitFire(x, y, 30);
     this.game.particles.emitSmoke(x, y, 20);
     this.game.particles.emitDust(x, y, 30);
 
-    // Flying debris
     this.game.chunks.spawnDebris(
       this.game.physics, this.game.resumeTexture!, x, y, 20, 15,
       this.game.getResumeSourceRect(x, y, 140)
     );
     this.game.chunks.spawnShards(this.game.physics, x, y, 12, 12);
-
-    // Apply explosion force to existing chunks
     this.game.physics.applyExplosion(x, y, 300, 0.08);
 
-    // Damage everything nearby
+    // damageAt uses viewport coords
     for (let dx = -100; dx <= 100; dx += 40) {
       for (let dy = -100; dy <= 100; dy += 40) {
-        this.damageAt(x + dx, y + dy, 10);
+        this.damageAt(vx + dx, vy + dy, 10);
       }
     }
 
-    // Massive shake
     this.game.shake(22, 0.5);
-
     this.game.audio.play('explosion');
   }
 }

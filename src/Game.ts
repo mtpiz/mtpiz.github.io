@@ -30,7 +30,9 @@ export class Game {
 
   private weapons: Map<WeaponType, Weapon> = new Map();
   private activeWeapon!: Weapon;
-  private cursorGfx!: Graphics;
+
+  // Separate cursor canvas (native 2D) — always in viewport coords
+  private cursorCtx!: CanvasRenderingContext2D;
 
   private state: GameState = {
     weapon: 'hammer',
@@ -52,18 +54,14 @@ export class Game {
     destroyed: false,
   };
 
-  // Shake state
   private shakeX = 0;
   private shakeY = 0;
 
-  // Resume element tracking
   private resumeEl!: HTMLElement;
   private mainEl!: HTMLElement;
 
-  // Damage tracking for DOM elements
   private elementDamage: Map<Element, number> = new Map();
 
-  // Callbacks
   onDamageChange?: (total: number, max: number) => void;
   onWeaponChange?: (weapon: WeaponType) => void;
 
@@ -75,8 +73,8 @@ export class Game {
     this.resumeEl = document.getElementById('page')!;
     this.mainEl = document.getElementById('main-area')!;
 
+    // --- Effects canvas (PixiJS) — fixed overlay ---
     const canvas = document.getElementById('pixi-canvas') as HTMLCanvasElement;
-
     this.app = new Application();
     await this.app.init({
       canvas,
@@ -87,6 +85,12 @@ export class Game {
       resolution: 1,
       autoDensity: false,
     });
+
+    // --- Cursor canvas (native 2D, separate layer) ---
+    const cursorCanvas = document.getElementById('cursor-canvas') as HTMLCanvasElement;
+    cursorCanvas.width = window.innerWidth;
+    cursorCanvas.height = window.innerHeight;
+    this.cursorCtx = cursorCanvas.getContext('2d')!;
 
     // Create layers
     this.fxContainer = new Container();
@@ -102,10 +106,6 @@ export class Game {
     this.fxContainer.addChild(this.chunks.container);
     this.fxContainer.addChild(this.particles.container);
 
-    // Cursor
-    this.cursorGfx = new Graphics();
-    this.app.stage.addChild(this.cursorGfx);
-
     // Init weapons
     this.weapons.set('hammer', new HammerWeapon(this));
     this.weapons.set('machinegun', new MachineGunWeapon(this));
@@ -118,26 +118,35 @@ export class Game {
     this.weapons.set('paintbrush', new PaintbrushWeapon(this));
     this.activeWeapon = this.weapons.get('hammer')!;
 
-    // Capture resume as texture for debris
     this.captureResumeTexture();
-
-    // Input
     this.setupInput();
 
-    // Resize
     window.addEventListener('resize', () => this.onResize());
 
     // Game loop
     this.app.ticker.add((ticker) => this.update(ticker.deltaTime / 60));
   }
 
+  /**
+   * Convert viewport (clientX/clientY) to effect-space coordinates.
+   *
+   * The PixiJS canvas is position:fixed over the entire viewport.
+   * Every frame, fxContainer is shifted by -scrollOffset so effects
+   * scroll with the resume. So when placing a new effect, we need to
+   * add the current scroll offset so that after the container shift,
+   * the effect appears at the right viewport position.
+   */
+  viewportToFx(vx: number, vy: number): { x: number; y: number } {
+    return {
+      x: vx + this.mainEl.scrollLeft,
+      y: vy + this.mainEl.scrollTop,
+    };
+  }
+
   private captureResumeTexture() {
-    // We'll use html2canvas-style approach: create a simple colored texture
-    // since we can't easily rasterize DOM in PixiJS
     const gfx = new Graphics();
     gfx.rect(0, 0, 200, 200);
     gfx.fill({ color: 0xffffff });
-    // Add some "text" lines
     for (let i = 0; i < 12; i++) {
       const w = 40 + Math.random() * 140;
       gfx.rect(10, 10 + i * 15, w, 8);
@@ -182,17 +191,12 @@ export class Game {
       this.activeWeapon.onPointerUp();
     });
 
-    // Keyboard weapon switching
     window.addEventListener('keydown', (e) => {
       this.state.shiftHeld = e.shiftKey;
-
-      // Number keys for weapons
       const idx = parseInt(e.key) - 1;
       if (idx >= 0 && idx < WEAPONS.length) {
         this.setWeapon(WEAPONS[idx].id);
       }
-
-      // R for reset
       if (e.key.toLowerCase() === 'r') {
         this.reset();
       }
@@ -202,7 +206,6 @@ export class Game {
       this.state.shiftHeld = e.shiftKey;
     });
 
-    // Prevent text selection on resume
     main.addEventListener('mousedown', (e) => {
       if ((e.target as Element)?.closest('#page')) {
         e.preventDefault();
@@ -211,43 +214,28 @@ export class Game {
   }
 
   setWeapon(type: WeaponType) {
-    // Clean up current weapon
     this.activeWeapon.onPointerUp();
     this.audio.stopAllLoops();
-
     this.state.weapon = type;
     this.activeWeapon = this.weapons.get(type)!;
     this.onWeaponChange?.(type);
   }
 
   private update(dt: number) {
-    // Cap delta to avoid huge jumps
     dt = Math.min(dt, 0.05);
 
-    // Physics
+    // Shift the entire effects container so effects scroll with the resume
+    this.fxContainer.position.set(-this.mainEl.scrollLeft, -this.mainEl.scrollTop);
+
     this.physics.update(dt * 1000);
-
-    // Weapons
     this.activeWeapon.update(dt);
-
-    // Particles
     this.particles.update(dt);
     this.particles.draw();
-
-    // Chunks
     this.chunks.update(dt, this.physics);
-
-    // Damage overlay
     this.damage.update(dt);
     this.damage.draw();
-
-    // Screen shake
     this.updateShake(dt);
-
-    // Cursor
     this.drawCursor();
-
-    // Stats
     this.onDamageChange?.(this.state.totalDamage, this.state.maxDamage);
   }
 
@@ -255,14 +243,13 @@ export class Game {
     if (this.state.shakeMagnitude > 0) {
       this.shakeX = (Math.random() * 2 - 1) * this.state.shakeMagnitude;
       this.shakeY = (Math.random() * 2 - 1) * this.state.shakeMagnitude;
-      this.state.shakeMagnitude *= Math.pow(0.05, dt); // exponential decay
+      this.state.shakeMagnitude *= Math.pow(0.05, dt);
 
       if (this.state.shakeMagnitude < 0.5) {
         this.state.shakeMagnitude = 0;
         this.shakeX = 0;
         this.shakeY = 0;
       }
-
       this.mainEl.style.transform = `translate(${this.shakeX}px, ${this.shakeY}px)`;
     } else {
       this.mainEl.style.transform = '';
@@ -273,45 +260,56 @@ export class Game {
     this.state.shakeMagnitude = Math.max(this.state.shakeMagnitude, magnitude);
   }
 
+  /** Cursor drawn on a separate native canvas so it always tracks viewport coords */
   private drawCursor() {
-    this.cursorGfx.clear();
+    const ctx = this.cursorCtx;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
     const x = this.state.pointerX;
     const y = this.state.pointerY;
-    const weapon = this.state.weapon;
 
-    // Main crosshair circle
-    this.cursorGfx.circle(x, y, 14);
-    this.cursorGfx.stroke({ color: 0xffffff, width: 1.5, alpha: 0.7 });
+    ctx.save();
+
+    // Outer circle
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.stroke();
 
     // Cross lines
-    const len = 8;
-    const gap = 4;
-    // Top
-    this.cursorGfx.moveTo(x, y - gap - len);
-    this.cursorGfx.lineTo(x, y - gap);
-    // Bottom
-    this.cursorGfx.moveTo(x, y + gap);
-    this.cursorGfx.lineTo(x, y + gap + len);
-    // Left
-    this.cursorGfx.moveTo(x - gap - len, y);
-    this.cursorGfx.lineTo(x - gap, y);
-    // Right
-    this.cursorGfx.moveTo(x + gap, y);
-    this.cursorGfx.lineTo(x + gap + len, y);
-    this.cursorGfx.stroke({ color: 0xffffff, width: 1.5, alpha: 0.8 });
+    const len = 8, gap = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - gap - len); ctx.lineTo(x, y - gap);
+    ctx.moveTo(x, y + gap); ctx.lineTo(x, y + gap + len);
+    ctx.moveTo(x - gap - len, y); ctx.lineTo(x - gap, y);
+    ctx.moveTo(x + gap, y); ctx.lineTo(x + gap + len, y);
+    ctx.stroke();
 
     // Center dot
-    this.cursorGfx.circle(x, y, 2);
-    this.cursorGfx.fill({ color: 0xff5544, alpha: 0.9 });
+    ctx.fillStyle = 'rgba(255,85,68,0.9)';
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
 
-    // Weapon-specific indicator
-    if (weapon === 'flame' && this.state.pointerDown) {
-      this.cursorGfx.circle(x, y, 38);
-      this.cursorGfx.stroke({ color: 0xff4400, width: 1, alpha: 0.4 });
-    } else if (weapon === 'dynamite') {
-      this.cursorGfx.circle(x, y, 24);
-      this.cursorGfx.stroke({ color: 0xff0000, width: 1, alpha: 0.5 });
+    // Weapon-specific ring
+    if (this.state.weapon === 'flame' && this.state.pointerDown) {
+      ctx.strokeStyle = 'rgba(255,68,0,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 38, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (this.state.weapon === 'dynamite') {
+      ctx.strokeStyle = 'rgba(255,0,0,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, 24, 0, Math.PI * 2);
+      ctx.stroke();
     }
+
+    ctx.restore();
   }
 
   // --- Public interface for weapons ---
@@ -344,12 +342,15 @@ export class Game {
 
   private getElementAt(x: number, y: number): Element | null {
     if (!this.inResumeBounds(x, y)) return null;
-    // Temporarily hide the canvas to hit-test the DOM underneath
     const canvas = this.app.canvas;
     const prev = canvas.style.pointerEvents;
     canvas.style.pointerEvents = 'none';
+    const cursorCanvas = this.cursorCtx.canvas;
+    const prevCursor = cursorCanvas.style.pointerEvents;
+    cursorCanvas.style.pointerEvents = 'none';
     const el = document.elementFromPoint(x, y);
     canvas.style.pointerEvents = prev;
+    cursorCanvas.style.pointerEvents = prevCursor;
     return el?.closest('#page .card, #page .resume-header, #page .resume-footer, #page h2, #page h3, #page p, #page a, #page strong') || null;
   }
 
@@ -374,7 +375,6 @@ export class Game {
     if (el.dataset.crumbled === '1') return;
     el.dataset.crumbled = '1';
 
-    // Wrap text in spans that can fall
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     const textNodes: Text[] = [];
     let node: Text | null;
@@ -392,7 +392,6 @@ export class Game {
         span.style.willChange = 'transform, opacity';
         frag.appendChild(span);
 
-        // Animate fall
         const dx = (Math.random() * 2 - 1) * 100;
         const dy = 80 + Math.random() * 200;
         const rot = (Math.random() * 2 - 1) * 90;
@@ -407,35 +406,29 @@ export class Game {
       textNode.parentNode?.replaceChild(frag, textNode);
     }
 
-    // Spawn physics debris from the element's position
     const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const fxPos = this.viewportToFx(cx, cy);
     this.chunks.spawnDebris(
-      this.physics, this.resumeTexture!, rect.left + rect.width / 2, rect.top + rect.height / 2,
-      8, 6,
-      { x: 0, y: 0, w: 200, h: 200 }
+      this.physics, this.resumeTexture!, fxPos.x, fxPos.y,
+      8, 6, { x: 0, y: 0, w: 200, h: 200 }
     );
-    this.particles.emitDust(rect.left + rect.width / 2, rect.top + rect.height / 2, 20);
+    this.particles.emitDust(fxPos.x, fxPos.y, 20);
     this.shake(8, 0.3);
   }
 
   healAll() {
-    // Reset all DOM damage
     for (const [el] of this.elementDamage) {
       const htmlEl = el as HTMLElement;
       htmlEl.style.filter = '';
       htmlEl.style.opacity = '';
-      if (htmlEl.dataset.crumbled === '1') {
-        // Can't easily un-crumble, reload instead
-      }
       delete htmlEl.dataset.crumbled;
     }
     this.elementDamage.clear();
     this.state.totalDamage = 0;
-
-    // Clear visual effects
     this.damage.clear();
 
-    // Remove all chunks
     for (const chunk of this.chunks.chunks) {
       this.chunks.container.removeChild(chunk.sprite);
       chunk.sprite.destroy();
@@ -444,14 +437,14 @@ export class Game {
     this.chunks.chunks.length = 0;
   }
 
-  reset() {
-    location.reload();
-  }
+  reset() { location.reload(); }
 
   onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.app.renderer.resize(w, h);
     this.physics.resize(w, h);
+    this.cursorCtx.canvas.width = w;
+    this.cursorCtx.canvas.height = h;
   }
 }

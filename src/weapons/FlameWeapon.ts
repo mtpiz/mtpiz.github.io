@@ -19,18 +19,12 @@ export class FlameWeapon extends Weapon {
 
   private applyFlame(x: number, y: number, shift: boolean) {
     if (!this.inBounds(x, y)) return;
-
     const radius = shift ? 55 : 38;
-
-    // Burn marks
-    this.game.damage.addBurn(x, y, radius);
-
-    // Fire particles rising
-    this.game.particles.emitFire(x, y, 8);
-    this.game.particles.emitEmbers(x, y, 4);
-    this.game.particles.emitSmoke(x, y - 20, 2);
-
-    // Damage
+    const f = this.toFx(x, y);
+    this.game.damage.addBurn(f.x, f.y, radius);
+    this.game.particles.emitFire(f.x, f.y, 8);
+    this.game.particles.emitEmbers(f.x, f.y, 4);
+    this.game.particles.emitSmoke(f.x, f.y - 20, 2);
     this.damageAt(x, y, shift ? 3 : 2);
   }
 

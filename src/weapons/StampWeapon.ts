@@ -13,9 +13,9 @@ export class StampWeapon extends Weapon {
     const colors = [0xff0000, 0xcc0000, 0xff2200, 0xdd0000];
     const color = colors[Math.floor(Math.random() * colors.length)];
 
-    // Stamp text
     const rotation = (Math.random() - 0.5) * 0.5;
     const size = shift ? 48 : 32 + Math.random() * 16;
+    const f = this.toFx(x, y);
 
     const text = new Text({
       text: label,
@@ -29,29 +29,24 @@ export class StampWeapon extends Weapon {
       },
     });
     text.anchor.set(0.5);
-    text.position.set(x, y);
+    text.position.set(f.x, f.y);
     text.rotation = rotation;
     text.alpha = 0.85;
     this.game.fxContainer.addChild(text);
 
-    // Stamp border
     const border = new Graphics();
     const w = text.width + 20;
     const h = text.height + 12;
     border.rect(-w / 2, -h / 2, w, h);
     border.stroke({ color, width: 3, alpha: 0.7 });
-    border.position.set(x, y);
+    border.position.set(f.x, f.y);
     border.rotation = rotation;
     this.game.fxContainer.addChild(border);
 
-    // Impact effect
-    this.game.particles.emitDust(x, y, 10);
+    this.game.particles.emitDust(f.x, f.y, 10);
     this.game.shake(6, 0.15);
     this.damageAt(x, y, 3);
-
     this.game.audio.play('stamp');
-
-    // These persist - they're permanent stamps on the resume
   }
 
   onPointerMove() {}

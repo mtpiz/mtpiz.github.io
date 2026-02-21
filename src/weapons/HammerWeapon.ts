@@ -9,33 +9,23 @@ export class HammerWeapon extends Weapon {
 
     const force = shift ? 12 : 8;
     const count = shift ? 10 : 6;
+    const f = this.toFx(x, y);
 
-    // Cracks radiating from impact
-    this.game.damage.addCrack(x, y, 60 + Math.random() * 40);
-
-    // Spawn physical debris chunks
-    this.game.chunks.spawnDebris(this.game.physics, this.game.resumeTexture!, x, y, count, force, this.game.getResumeSourceRect(x, y, 60));
-
-    // Particles: sparks + dust
-    this.game.particles.emitSparks(x, y, 25);
-    this.game.particles.emitDust(x, y, 15);
-
-    // Damage resume elements
+    this.game.damage.addCrack(f.x, f.y, 60 + Math.random() * 40);
+    this.game.chunks.spawnDebris(this.game.physics, this.game.resumeTexture!, f.x, f.y, count, force, this.game.getResumeSourceRect(f.x, f.y, 60));
+    this.game.particles.emitSparks(f.x, f.y, 25);
+    this.game.particles.emitDust(f.x, f.y, 15);
     this.damageAt(x, y, shift ? 8 : 5);
-
-    // Screen shake
     this.game.shake(shift ? 14 : 9, 0.3);
-
-    // Sound
     this.game.audio.play('hammer');
   }
 
-  onPointerMove(x: number, y: number, prevX: number, prevY: number, shift: boolean) {
-    // Hammer can also do drag impacts — lighter hits
+  onPointerMove(x: number, y: number, _prevX: number, _prevY: number, _shift: boolean) {
     if (!this.inBounds(x, y)) return;
-    this.game.damage.addCrack(x, y, 30 + Math.random() * 20);
-    this.game.particles.emitSparks(x, y, 5);
-    this.game.particles.emitDust(x, y, 3);
+    const f = this.toFx(x, y);
+    this.game.damage.addCrack(f.x, f.y, 30 + Math.random() * 20);
+    this.game.particles.emitSparks(f.x, f.y, 5);
+    this.game.particles.emitDust(f.x, f.y, 3);
     this.damageAt(x, y, 1);
     this.game.shake(3, 0.1);
   }

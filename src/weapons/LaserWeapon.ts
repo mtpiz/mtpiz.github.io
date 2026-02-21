@@ -14,7 +14,7 @@ export class LaserWeapon extends Weapon {
     game.fxContainer.addChild(this.beamGfx);
   }
 
-  onPointerDown(x: number, y: number, _shift: boolean) {
+  onPointerDown(_x: number, _y: number, _shift: boolean) {
     this.cutting = true;
   }
 
@@ -23,42 +23,31 @@ export class LaserWeapon extends Weapon {
     if (!this.inBounds(x, y) && !this.inBounds(prevX, prevY)) return;
 
     const width = shift ? 10 : 5;
+    const f = this.toFx(x, y);
+    const fp = this.toFx(prevX, prevY);
 
-    // Persistent cut line
-    this.game.damage.addCut(prevX, prevY, x, y, width);
+    this.game.damage.addCut(fp.x, fp.y, f.x, f.y, width);
 
-    // Glowing beam effect (temporary)
     this.beamGfx.clear();
-    // Outer glow
-    this.beamGfx.moveTo(prevX, prevY);
-    this.beamGfx.lineTo(x, y);
+    this.beamGfx.moveTo(fp.x, fp.y);
+    this.beamGfx.lineTo(f.x, f.y);
     this.beamGfx.stroke({ color: 0xff2200, width: width + 8, alpha: 0.3 });
-    // Core beam
-    this.beamGfx.moveTo(prevX, prevY);
-    this.beamGfx.lineTo(x, y);
+    this.beamGfx.moveTo(fp.x, fp.y);
+    this.beamGfx.lineTo(f.x, f.y);
     this.beamGfx.stroke({ color: 0xff6644, width: width + 2, alpha: 0.6 });
-    // White hot center
-    this.beamGfx.moveTo(prevX, prevY);
-    this.beamGfx.lineTo(x, y);
+    this.beamGfx.moveTo(fp.x, fp.y);
+    this.beamGfx.lineTo(f.x, f.y);
     this.beamGfx.stroke({ color: 0xffffff, width: 2, alpha: 0.9 });
-
     this.beamGfx.alpha = 1;
     this.fadeTimer = 0.1;
 
-    // Embers at cut point
-    this.game.particles.emitEmbers(x, y, 3);
-    this.game.particles.emitSparks(x, y, 4);
-
-    // Damage
-    const turbo = shift ? 2 : 1;
-    this.damageAt(x, y, 1 * turbo);
-
+    this.game.particles.emitEmbers(f.x, f.y, 3);
+    this.game.particles.emitSparks(f.x, f.y, 4);
+    this.damageAt(x, y, (shift ? 2 : 1));
     this.game.audio.play('laser');
   }
 
-  onPointerUp() {
-    this.cutting = false;
-  }
+  onPointerUp() { this.cutting = false; }
 
   update(dt: number) {
     if (this.fadeTimer > 0) {

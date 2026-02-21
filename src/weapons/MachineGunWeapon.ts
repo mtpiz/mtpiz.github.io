@@ -4,7 +4,7 @@ import type { Game } from '../Game';
 export class MachineGunWeapon extends Weapon {
   private firing = false;
   private fireTimer = 0;
-  private fireRate = 0.06; // seconds between shots
+  private fireRate = 0.06;
   private targetX = 0;
   private targetY = 0;
   private shift = false;
@@ -34,30 +34,17 @@ export class MachineGunWeapon extends Weapon {
   }
 
   private fireShot(x: number, y: number) {
-    // Spread
     const spread = this.shift ? 12 : 6;
     const sx = x + (Math.random() - 0.5) * spread;
     const sy = y + (Math.random() - 0.5) * spread;
-
     if (!this.inBounds(sx, sy)) return;
 
-    // Bullet hole
-    const holeRadius = 3 + Math.random() * 3;
-    this.game.damage.addHole(sx, sy, holeRadius);
-
-    // Particles
-    this.game.particles.emitBulletImpact(sx, sy);
-
-    // Small debris
-    this.game.chunks.spawnShards(this.game.physics, sx, sy, 2, 3);
-
-    // Damage
+    const f = this.toFx(sx, sy);
+    this.game.damage.addHole(f.x, f.y, 3 + Math.random() * 3);
+    this.game.particles.emitBulletImpact(f.x, f.y);
+    this.game.chunks.spawnShards(this.game.physics, f.x, f.y, 2, 3);
     this.damageAt(sx, sy, 2);
-
-    // Tiny shake
     this.game.shake(2, 0.05);
-
-    // Sound
     this.game.audio.play('gunshot');
   }
 

@@ -6,7 +6,7 @@ export class ChainsawWeapon extends Weapon {
 
   constructor(game: Game) { super(game); }
 
-  onPointerDown(x: number, y: number, _shift: boolean) {
+  onPointerDown(_x: number, _y: number, _shift: boolean) {
     this.cutting = true;
     this.game.audio.ensureLoop('chainsaw');
   }
@@ -16,46 +16,40 @@ export class ChainsawWeapon extends Weapon {
     if (!this.inBounds(x, y)) return;
 
     const turbo = shift ? 2 : 1;
+    const f = this.toFx(x, y);
+    const fp = this.toFx(prevX, prevY);
 
-    // Jagged tear line (multiple segments with random offsets)
-    const segs = 10;
-    const dx = x - prevX;
-    const dy = y - prevY;
+    const dx = f.x - fp.x;
+    const dy = f.y - fp.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 2) return;
 
-    // Calculate perpendicular
     const nx = -dy / dist;
     const ny = dx / dist;
 
-    let lastX = prevX;
-    let lastY = prevY;
+    let lastX = fp.x;
+    let lastY = fp.y;
+    const segs = 10;
     for (let i = 1; i <= segs; i++) {
       const t = i / segs;
-      const mx = prevX + dx * t;
-      const my = prevY + dy * t;
+      const mx = fp.x + dx * t;
+      const my = fp.y + dy * t;
       const offset = (Math.random() - 0.5) * 18;
-      const fx = mx + nx * offset;
-      const fy = my + ny * offset;
-
-      this.game.damage.addCut(lastX, lastY, fx, fy, 4 + Math.random() * 4);
-      lastX = fx;
-      lastY = fy;
+      const sx = mx + nx * offset;
+      const sy = my + ny * offset;
+      this.game.damage.addCut(lastX, lastY, sx, sy, 4 + Math.random() * 4);
+      lastX = sx;
+      lastY = sy;
     }
 
-    // Splinters flying away from cut
-    this.game.particles.emitSplinters(x, y, 6 * turbo, dx, dy);
-    this.game.particles.emitDust(x, y, 4);
+    this.game.particles.emitSplinters(f.x, f.y, 6 * turbo, dx, dy);
+    this.game.particles.emitDust(f.x, f.y, 4);
 
-    // Small debris chunks
     if (Math.random() < 0.3) {
-      this.game.chunks.spawnShards(this.game.physics, x, y, 2, 4);
+      this.game.chunks.spawnShards(this.game.physics, f.x, f.y, 2, 4);
     }
 
-    // Damage
     this.damageAt(x, y, 2 * turbo);
-
-    // Shake while cutting
     this.game.shake(4, 0.08);
   }
 
